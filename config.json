@@ -1,0 +1,7 @@
+{
+    "default_quality": "1080p",
+    "download_folder": "./downloads",
+    "max_retries": 3,
+    "audio_format": "mp3",
+    "audio_quality": "320"
+}
