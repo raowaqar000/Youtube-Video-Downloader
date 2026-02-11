@@ -16,6 +16,10 @@ class YouTubeDownloader:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         self.quality = quality
+        # Set defaults before loading config
+        self.max_retries = 3
+        self.audio_format = 'mp3'
+        self.audio_quality = '320'
         self.load_config()
         
     def load_config(self):
@@ -26,9 +30,9 @@ class YouTubeDownloader:
                 config = json.load(f)
                 self.quality = config.get('default_quality', self.quality)
                 self.output_dir = Path(config.get('download_folder', self.output_dir))
-                self.max_retries = config.get('max_retries', 3)
-                self.audio_format = config.get('audio_format', 'mp3')
-                self.audio_quality = config.get('audio_quality', '320')
+                self.max_retries = config.get('max_retries', self.max_retries)
+                self.audio_format = config.get('audio_format', self.audio_format)
+                self.audio_quality = str(config.get('audio_quality', self.audio_quality))
     
     def get_format_string(self, quality, audio_only=False):
         """Get yt-dlp format string based on quality"""
@@ -36,12 +40,12 @@ class YouTubeDownloader:
             return 'bestaudio/best'
         
         quality_map = {
-            '2160p': 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160][ext=mp4]/best',
-            '1440p': 'bestvideo[height<=1440][ext=mp4]+bestaudio[ext=m4a]/best[height<=1440][ext=mp4]/best',
-            '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
-            '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
-            '480p': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best',
-            '360p': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best',
+            '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]/best',
+            '1440p': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]/best',
+            '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+            '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]/best',
+            '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]/best',
         }
         
         return quality_map.get(quality, quality_map['1080p'])
@@ -63,11 +67,15 @@ class YouTubeDownloader:
             '--ignore-errors',
             '--no-warnings',
             '--newline',
+            '--merge-output-format', 'mp4',
+            '--retries', str(self.max_retries),
         ]
         
         if audio_only:
+            # Remove merge-output-format for audio
+            cmd = [c for c in cmd if c not in ('--merge-output-format', 'mp4')]
             cmd.extend([
-                '-x',  # Extract audio
+                '-x',
                 '--audio-format', self.audio_format,
                 '--audio-quality', self.audio_quality,
             ])

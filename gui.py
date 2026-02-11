@@ -18,7 +18,7 @@ class DownloaderGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("YouTube Video Downloader")
-        self.root.geometry("700x600")
+        self.root.geometry("700x650")
         self.root.resizable(False, False)
         
         # Variables
@@ -57,31 +57,64 @@ class DownloaderGUI:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Input section
-        input_frame = ttk.LabelFrame(main_frame, text="📌 Input", padding="10")
+        input_frame = ttk.LabelFrame(main_frame, text="Input", padding="10")
         input_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Single URL
         ttk.Label(input_frame, text="Single Video URL:").grid(row=0, column=0, sticky=tk.W, pady=5)
         url_entry = ttk.Entry(input_frame, textvariable=self.url_var, width=60)
-        url_entry.grid(row=0, column=1, columnspan=2, sticky=tk.EW, pady=5)
+        url_entry.grid(row=0, column=1, columnspan=3, sticky=tk.EW, pady=5)
         
         # OR label
         ttk.Label(input_frame, text="— OR —", font=("Arial", 10, "bold")).grid(
-            row=1, column=0, columnspan=3, pady=10
+            row=1, column=0, columnspan=4, pady=10
         )
         
         # Bulk file
         ttk.Label(input_frame, text="Bulk File (txt):").grid(row=2, column=0, sticky=tk.W, pady=5)
-        file_entry = ttk.Entry(input_frame, textvariable=self.file_var, width=50, state="readonly")
+        file_entry = ttk.Entry(input_frame, textvariable=self.file_var, width=50)
         file_entry.grid(row=2, column=1, sticky=tk.EW, pady=5)
         
         browse_btn = ttk.Button(input_frame, text="Browse", command=self.browse_file)
         browse_btn.grid(row=2, column=2, padx=(5, 0), pady=5)
         
+        clear_file_btn = ttk.Button(input_frame, text="Clear", command=self.clear_file)
+        clear_file_btn.grid(row=2, column=3, padx=(5, 0), pady=5)
+        
+        # Download buttons inside input frame
+        button_inner_frame = ttk.Frame(input_frame)
+        button_inner_frame.grid(row=3, column=0, columnspan=4, pady=(15, 5), sticky=tk.EW)
+        
+        # Configure style for download button
+        style = ttk.Style()
+        style.configure('Big.TButton', font=('Arial', 11, 'bold'))
+        
+        self.download_btn = ttk.Button(
+            button_inner_frame,
+            text="START DOWNLOAD",
+            command=self.start_download,
+            style="Big.TButton"
+        )
+        self.download_btn.pack(side=tk.LEFT, padx=(0, 10), ipadx=15, ipady=5)
+        
+        stop_btn = ttk.Button(
+            button_inner_frame,
+            text="Stop",
+            command=self.stop_download
+        )
+        stop_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        clear_log_btn = ttk.Button(
+            button_inner_frame,
+            text="Clear Log",
+            command=self.clear_log
+        )
+        clear_log_btn.pack(side=tk.LEFT)
+        
         input_frame.columnconfigure(1, weight=1)
         
         # Settings section
-        settings_frame = ttk.LabelFrame(main_frame, text="⚙️ Settings", padding="10")
+        settings_frame = ttk.LabelFrame(main_frame, text="Settings", padding="10")
         settings_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Quality selection
@@ -122,7 +155,7 @@ class DownloaderGUI:
         # Get size button
         get_size_btn = ttk.Button(
             settings_frame,
-            text="📊 Get Video Size",
+            text="Get Video Size",
             command=self.get_video_size
         )
         get_size_btn.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=5)
@@ -130,40 +163,12 @@ class DownloaderGUI:
         settings_frame.columnconfigure(1, weight=1)
         
         # Log section
-        log_frame = ttk.LabelFrame(main_frame, text="📋 Download Log", padding="10")
-        log_frame.pack(fill=tk.BOTH, pady=10)
+        log_frame = ttk.LabelFrame(main_frame, text="Download Log", padding="10")
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        # Configure style for download button
-        style = ttk.Style()
-        style.configure('Big.TButton', font=('Arial', 12, 'bold'))
-        
-        self.download_btn = ttk.Button(
-            button_frame,
-            text="⬇️ START DOWNLOAD",
-            command=self.start_download,
-            style="Big.TButton",
-            width=25
-        )
+        # Create log_text widget
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=8, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
-        
-        # Button section
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X)
-        
-        self.download_btn = ttk.Button(
-            button_frame,
-            text="⬇️ Start Download",
-            command=self.start_download,
-            style="Accent.TButton"
-        )
-        self.download_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        clear_btn = ttk.Button(
-            button_frame,
-            text="🗑️ Clear Log",
-            command=self.clear_log
-        )
-        clear_btn.pack(side=tk.LEFT)
         
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -184,6 +189,18 @@ class DownloaderGUI:
         
     def clear_log(self):
         """Clear the log"""
+        self.log_text.delete(1.0, tk.END)
+    
+    def clear_file(self):
+        """Clear the selected file"""
+        self.file_var.set("")
+    
+    def stop_download(self):
+        """Stop the current download"""
+        if self.is_downloading:
+            self.is_downloading = False
+            self.status_var.set("Stopping...")
+            self.log("⚠️ Stop requested - will stop after current download")
     
     def get_video_size(self):
         """Get video size information"""
@@ -225,16 +242,9 @@ class DownloaderGUI:
                 formats = info.get('formats', [])
                 target_height = int(quality.replace('p', ''))
                 
-            # Handle 2K/4K quality labels
-            quality = self.quality_var.get()
-            if "2K" in quality:
-                quality = "1440p"
-            elif "4K" in quality:
-                quality = "2160p"
-            
-            downloader = YouTubeDownloader(
-                output_dir=self.output_var.get(),
-                quality=qualityrget_height and fmt.get('filesize'):
+                best_format = None
+                for fmt in formats:
+                    if fmt.get('height') == target_height and fmt.get('filesize'):
                         best_format = fmt
                         break
                 
@@ -266,7 +276,6 @@ class DownloaderGUI:
             self.video_size_var.set("❌ Timeout - Try again")
         except Exception as e:
             self.video_size_var.set(f"❌ Error: {str(e)}")
-        self.log_text.delete(1.0, tk.END)
         
     def browse_file(self):
         """Browse for input file"""
@@ -277,6 +286,13 @@ class DownloaderGUI:
         if filename:
             self.file_var.set(filename)
             self.url_var.set("")  # Clear URL if file is selected
+            # Show how many URLs are in the file
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    urls = [line.strip() for line in f if line.strip() and line.strip().startswith('http')]
+                self.log(f"📋 Loaded {len(urls)} URLs from file")
+            except Exception as e:
+                self.log(f"❌ Error reading file: {e}")
             
     def browse_output(self):
         """Browse for output folder"""
@@ -309,32 +325,153 @@ class DownloaderGUI:
     def download_thread(self, url, file):
         """Download thread"""
         try:
-            # Redirect stdout to log
-            sys.stdout = TextRedirector(self.log_text, "stdout")
+            # Handle 2K/4K quality labels
+            quality = self.quality_var.get()
+            if "2K" in quality:
+                quality = "1440p"
+            elif "4K" in quality:
+                quality = "2160p"
             
             downloader = YouTubeDownloader(
                 output_dir=self.output_var.get(),
-                quality=self.quality_var.get()
+                quality=quality
             )
             
             if url:
-                downloader.download_single(url, self.audio_only_var.get())
+                self.log(f"🎬 Starting download: {url}")
+                self.log(f"📊 Quality: {quality}")
+                self.download_with_logging(downloader, url, self.audio_only_var.get())
             elif file:
-                downloader.download_bulk(file, self.audio_only_var.get())
+                self.log(f"📋 Starting bulk download from: {file}")
+                self.log(f"📊 Quality: {quality}")
+                self.bulk_download_with_logging(downloader, file, self.audio_only_var.get())
             
-            self.status_var.set("Download completed!")
-            messagebox.showinfo("Success", "Download completed successfully!")
+            if self.is_downloading:
+                self.status_var.set("Download completed!")
+                self.root.after(0, lambda: messagebox.showinfo("Success", "Download completed successfully!"))
+            else:
+                self.status_var.set("Download stopped")
             
         except Exception as e:
-            self.log(f"❌ Error: {str(e)}")
+            err_msg = str(e)
+            self.log(f"❌ Error: {err_msg}")
             self.status_var.set("Download failed!")
-            messagebox.showerror("Error", f"Download failed:\n{str(e)}")
+            self.root.after(0, lambda msg=err_msg: messagebox.showerror("Error", f"Download failed:\n{msg}"))
             
         finally:
-            sys.stdout = sys.__stdout__
             self.is_downloading = False
-            self.download_btn.config(state="normal")
-            self.status_var.set("Ready")
+            self.root.after(0, lambda: self.download_btn.config(state="normal"))
+            self.root.after(0, lambda: self.status_var.set("Ready"))
+    
+    def download_with_logging(self, downloader, url, audio_only):
+        """Download single video with GUI logging"""
+        import subprocess
+        
+        format_string = downloader.get_format_string(downloader.quality, audio_only)
+        
+        cmd = [
+            'yt-dlp',
+            '-f', format_string,
+            '-o', str(downloader.output_dir / '%(title)s.%(ext)s'),
+            '--no-overwrites',
+            '--continue',
+            '--ignore-errors',
+            '--newline',
+            '--progress',
+        ]
+        
+        if audio_only:
+            cmd.extend([
+                '-x',
+                '--audio-format', downloader.audio_format,
+                '--audio-quality', downloader.audio_quality,
+            ])
+        else:
+            cmd.extend([
+                '--merge-output-format', 'mp4',
+            ])
+        
+        cmd.append(url)
+        
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            for line in process.stdout:
+                if not self.is_downloading:
+                    process.terminate()
+                    break
+                line = line.strip()
+                if line:
+                    self.root.after(0, lambda l=line: self.log(l))
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                self.root.after(0, lambda: self.log("✅ Download completed!"))
+                return True
+            else:
+                self.root.after(0, lambda: self.log("❌ Download failed"))
+                return False
+                
+        except Exception as e:
+            err_msg = str(e)
+            self.root.after(0, lambda msg=err_msg: self.log(f"❌ Error: {msg}"))
+            return False
+    
+    def bulk_download_with_logging(self, downloader, file_path, audio_only):
+        """Download multiple videos with GUI logging"""
+        from pathlib import Path
+        
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            self.root.after(0, lambda: self.log(f"❌ File not found: {file_path}"))
+            return
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            urls = [line.strip() for line in f if line.strip() and line.strip().startswith('http')]
+        
+        if not urls:
+            self.root.after(0, lambda: self.log("❌ No valid URLs found in file"))
+            return
+        
+        self.root.after(0, lambda: self.log(f"\n📋 Found {len(urls)} URLs to download"))
+        
+        success_count = 0
+        failed_urls = []
+        
+        for i, url in enumerate(urls, 1):
+            if not self.is_downloading:
+                self.root.after(0, lambda: self.log("\n⚠️ Download stopped by user"))
+                break
+                
+            self.root.after(0, lambda i=i, total=len(urls): self.log(f"\n{'='*50}"))
+            self.root.after(0, lambda i=i, total=len(urls): self.log(f"📥 Downloading {i}/{total}"))
+            self.root.after(0, lambda u=url: self.log(f"URL: {u}"))
+            self.root.after(0, lambda: self.status_var.set(f"Downloading {i}/{len(urls)}..."))
+            
+            if self.download_with_logging(downloader, url, audio_only):
+                success_count += 1
+            else:
+                failed_urls.append(url)
+        
+        # Summary
+        self.root.after(0, lambda: self.log(f"\n{'='*50}"))
+        self.root.after(0, lambda: self.log(f"📊 DOWNLOAD SUMMARY"))
+        self.root.after(0, lambda: self.log(f"{'='*50}"))
+        self.root.after(0, lambda s=success_count, t=len(urls): self.log(f"✅ Successful: {s}/{t}"))
+        self.root.after(0, lambda f=len(failed_urls), t=len(urls): self.log(f"❌ Failed: {f}/{t}"))
+        
+        if failed_urls:
+            self.root.after(0, lambda: self.log(f"\n❌ Failed URLs:"))
+            for url in failed_urls:
+                self.root.after(0, lambda u=url: self.log(f"  - {u}"))
 
 class TextRedirector:
     """Redirect text output to tkinter widget"""
